@@ -26,3 +26,5 @@ Imports:
     parallel,
     sn,
     truncnorm
+URL: https://github.com/soonsk-vcu/MVSKmod
+BugReports: https://github.com/soonsk-vcu/MVSKmod/issues
