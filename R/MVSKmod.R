@@ -1121,8 +1121,8 @@ cmupdate <- function(cycle, Y, X, latentvars, theta, dist) {
 
 
 # return function, just for aggregating output
-aecmreport <- function(i,theta_g, theta, qfinal) {
-  list("Iteration" = i, "Starting Value" = theta_g, "Final Value" = theta, "Stopping Criteria" = qfinal)
+aecmreport <- function(i,theta_g, theta, qfinal, dist) {
+  list("Iteration" = i, "Starting Value" = theta_g, "Final Value" = theta, "Stopping Criteria" = qfinal, Distribution = dist)
 }
 
 
@@ -1214,7 +1214,7 @@ aecm_mvgh <-
           error = function(e) {
             print(e)
             # browser()
-            return(aecmreport(-1,theta_g, theta, linfhist))
+            return(aecmreport(-1,theta_g, theta, linfhist, dist))
 
           }
         )
@@ -1250,7 +1250,7 @@ aecm_mvgh <-
       # print(linf_i)
       if (linf_i < stopping || ( i >10 && linf_i > thresh)) {
         #browser()
-        return(aecmreport(i, theta_g, theta, linfhist))
+        return(aecmreport(i, theta_g, theta, linfhist, dist))
       }
 
 
@@ -1264,7 +1264,7 @@ aecm_mvgh <-
     cat("\r",(paste0("Completed ", iter, "/", iter, " iterations")))
     cat("\n")
     # worst case: no convergence
-    aecmreport(Inf, theta_g, theta, linfhist)
+    aecmreport(Inf, theta_g, theta, linfhist, dist)
   }
 
 
@@ -1349,10 +1349,89 @@ MVSKmod <- function(Y,
                     stopping = 1e-3,
                     max_iter = 50) {
   # add mvsk funciton here with error checks, likelihood/aic summary, etc
+  if(!is.list(Y) | !is.list(X)){
+    stop("Data not in list format")
+  } else if (!(dist %in% c("mvgh", "mvvg", "mvnig"))) {
+    stop("Invalid distribution")
+  } else if (!is.numeric(stopping)){
+    stop("Non-numeric stopping value")
+  } else if (!is.numeric(max_iter) | max_iter < 1){
+    stop("Invalid max iteration value")
+  }
 
 
   # You stopped here
-  stop("Add error checks")
   aecm_mvgh(Y,X,theta_g, dist, stopping = stopping, thresh = Inf, iter = max_iter)
 
+}
+
+# mod_aic <- function(loglik, Y,X,theta){
+#   q <- length(unlist(theta))
+#   2*q - 2*loglik(Y,X,theta)
+# }
+
+#' AIC for Matrix-Variate Models
+#'
+#' Calculates AIC for MVGH, MVVG, and MVNIG models.
+#'
+#' @param dist Model distribution. Valid arguments are "mvgh", "mvvg", and "mvnig".
+#' @param Y List of \eqn{n_i \times p} response matrices. Matrices must have same number of columns.
+#' @param X List of \eqn{n_i \times q} design matrices. Matrices must have same number of columns.
+#' @param theta List of parameter estimates
+#' @return AIC of the model.
+#' @export
+#' @author Samuel Soon
+#' @author Dipankar Bandyopadhyay
+#' @author Qingyang Liu
+#' @examples
+#' AIC("mvvg", gaad_res, gaad_cov, mvvg_theta)
+
+
+AIC <- function(dist, Y,X,theta){
+  if(dist == "mvgh"){
+    loglik <- q1.mvgh.update
+  } else if (dist == "mvvg"){
+    loglik <- q1.mvvg.update
+  } else if (dist == "mvnig"){
+    loglik <- q1.mvnig.update
+  } else{
+    stop("Unsupported Distribution")
+  }
+
+  q <- length(unlist(theta))
+  2*q - 2*loglik(Y,X,theta)
+}
+
+
+#' BIC for Matrix-Variate Models
+#'
+#' Calculates BIC for MVGH, MVVG, and MVNIG models.
+#'
+#' @param dist Model distribution. Valid arguments are "mvgh", "mvvg", and "mvnig".
+#' @param Y List of \eqn{n_i \times p} response matrices. Matrices must have same number of columns.
+#' @param X List of \eqn{n_i \times q} design matrices. Matrices must have same number of columns.
+#' @param theta List of parameter estimates
+#' @return BIC of the model.
+#' @export
+#' @author Samuel Soon
+#' @author Dipankar Bandyopadhyay
+#' @author Qingyang Liu
+#' @examples
+#' BIC("mvvg", gaad_res, gaad_cov, mvvg_theta)
+
+BIC <- function(dist, Y,X,theta){
+  if(dist == "mvgh"){
+    loglik <- q1.mvgh.update
+  } else if (dist == "mvvg"){
+    loglik <- q1.mvvg.update
+  } else if (dist == "mvnig"){
+    loglik <- q1.mvnig.update
+  } else{
+    stop("Unsupported Distribution")
+  }
+
+  q <- length(unlist(theta))
+  ni <- unlist(sapply(Y, nrow))
+  n <- sum(ni) * ncol(Y[[1]])
+  q*log(n) - 2*loglik(Y,X,theta)
 }

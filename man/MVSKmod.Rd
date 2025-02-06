@@ -12,12 +12,12 @@ MVSKmod(Y, X, theta_g = NULL, dist, stopping = 0.001, max_iter = 50)
 \item{X}{List of \eqn{n_i \times q} design matrices. Matrices must have same number of columns.}
 
 \item{theta_g}{List of parameters to pass as initial values in the AECM algorithm.
-If NULL, will be randomly generated. See details for an in-depth explanation.}
+If NULL, will be randomly generated. See Details for an in-depth explanation.}
 
 \item{dist}{Modeling distribution. Select "mvgh" for matrix-variate generalized
-hyperbolic, "mvvg" for variance-gamma, and "MVNIG" for normal-inverse Gaussian.}
+hyperbolic, "mvvg" for variance-gamma, and "mvnig" for normal-inverse Gaussian.}
 
-\item{stopping}{AECM stopping threshold for
+\item{stopping}{Stopping threshold for the L-infinity norm of differences in consecutive parameter space, evaluated at iteration \eqn{t+1} as
 \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty}. Default is 0.001}
 
 \item{iter}{Maximum number of iterations, default is 50.}
