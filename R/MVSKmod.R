@@ -1267,124 +1267,29 @@ aecm_mvgh <-
     aecmreport(Inf, theta_g, theta, linfhist, dist)
   }
 
-
-#' AECM Estimation for Matrix-Variate Skew Models
-#'
-#' This function fits linear models for matrix data with varying row sizes,
-#'  according to the three matrix-variate skew distributions described in
-#'   (Gallaugher & McNicholas, 2019). Exchangeable observation row correlation
-#'   and skewness structures are imposed to accommodate the varying row counts
-#'   across matrices.
-#'
-#'
-#' @param Y List of \eqn{n_i \times p} response matrices. Matrices must have same number of columns.
-#' @param X List of \eqn{n_i \times q} design matrices. Matrices must have same number of columns.
-#' @param theta_g List of parameters to pass as initial values in the AECM algorithm.
-#'  If NULL, will be randomly generated. See Details for an in-depth explanation.
-#' @param dist Modeling distribution. Select "mvgh" for matrix-variate generalized
-#'  hyperbolic, "mvvg" for variance-gamma, and "mvnig" for normal-inverse Gaussian.
-#' @param stopping Stopping threshold for the L-infinity norm of differences in consecutive parameter space, evaluated at iteration \eqn{t+1} as
-#' \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty}. Default is 0.001
-#' @param iter Maximum number of iterations, default is 50.
-#' @details
-#' Fits the matrix-variate skew regression model
-#'
-#'  \deqn{Y_i = X_i \Theta + E_i,}
-#'
-#' where each response \eqn{Y_i} is a \eqn{n_i \times p} matrix that indexes \eqn{n_i} observations and \eqn{p} response variables. \eqn{X_i} corresponds to a \eqn{n_i \times q} design matrix, and \eqn{\Theta} corresponds to a \eqn{q \times p} coefficient matrix. \eqn{E_i} corresponds to a \eqn{n_i \times p} error matrix, following a matrix-variate skew distribution.
-#'
-#' Supported distributions include the matrix-variate generalized hyperbolic (MVGH), matrix-variate variance-gamma (MVVG), and matrix-variate normal-inverse Gaussian (MVNIG). Certain reparametrizations are implemented to avoid identifiability issues (Gallaugher & McNicholas, 2019). Additionally, the row correlation matrix \eqn{\Sigma_i} is reduced to a correlation matrix with exchangeable structure based on correlation parameter \eqn{\rho}, and skewness parameter \eqn{A_i} is represented as a function of skewness vector \eqn{a}: \eqn{A_i = \underline{1}_{n_i} a^T}.
-#'
-#' The structure of `theta_g` and parameter estimates returned by the function must be in the form of a list with the following named elements:
-#'
-#' \itemize{
-#'  \item{`Theta`: } {\eqn{q \times p} coefficient matrix}
-#'  \item{`a`: } {\eqn{p \times 1} skewness vector}
-#'  \item{`rho`: } {Compound symmetry parameter for row correlation matrix}
-#'  \item{`Psi`: } {\eqn{p \times p} column covariance matrix}
-#'  \item{`gamma`: } {Univariate mixing parameter, only included when running MVVG model}
-#'  \item{`tgamma`: } {Univariate mixing parameter, only included when running MVVG model}
-#' }
-#'
-#' @return MVSKmod returns a list with the following elements:
-#'
-#' \itemize{
-#'  \item{`Iteration`: } {Number of iterations taken to convergence. `Inf` if convergence not reached.}
-#'  \item{`Starting Value`: } {List of initial parameter values.}
-#'  \item{`Final Value`: } {List of final parameter estimates.}
-#'  \item{`Stopping Criteria`: } {Vector of \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty} at each iteration.}
-#' }
-
-#' @export
-
-#' @author Samuel Soon
-#' @author Dipankar Bandyopadhyay
-#' @author Qingyang Liu
-#' @examples
-#' set.seed(1234)
-#' # num response variables
-#' p <- ncol(gaad_res[[1]])
-#' # num covariates
-#' q <- ncol(gaad_cov[[1]])
-#' # generate initial value to input, then run AECM with MVVG distribution
-#' initial_mvvg_theta <- list(Theta = matrix(rnorm(p*q), nrow = q, ncol = p),
-#'                       A = rep(1,p),
-#'                      rho = 0.3,
-#'                      Psi = diag(p),
-#'                      gamma = 4)
-#' MVSKmod(gaad_res[1:50], gaad_cov[1:50], initial_mvvg_theta, "mvvg")
-#'
-#' p <- ncol(gaad_res[[1]])
-#' q <- ncol(gaad_cov[[1]])
-#' initial_mvnig_theta <- list(Theta = matrix(rnorm(p*q), nrow = q, ncol = p),
-#'                       A = rep(1,p),
-#'                      rho = 0.3,
-#'                      Psi = diag(p),
-#'                      tgamma = 3)
-#' MVSKmod(gaad_res[1:50], gaad_cov[1:50], initial_mvnig_theta, "mvnig")
-MVSKmod <- function(Y,
-                    X,
-                    theta_g = NULL,
-                    dist,
-                    stopping = 1e-3,
-                    max_iter = 50) {
-  # add mvsk funciton here with error checks, likelihood/aic summary, etc
-  if(!is.list(Y) | !is.list(X)){
-    stop("Data not in list format")
-  } else if (!(dist %in% c("mvgh", "mvvg", "mvnig"))) {
-    stop("Invalid distribution")
-  } else if (!is.numeric(stopping)){
-    stop("Non-numeric stopping value")
-  } else if (!is.numeric(max_iter) | max_iter < 1){
-    stop("Invalid max iteration value")
-  }
-
-
-  # You stopped here
-  aecm_mvgh(Y,X,theta_g, dist, stopping = stopping, thresh = Inf, iter = max_iter)
-
-}
-
-# mod_aic <- function(loglik, Y,X,theta){
-#   q <- length(unlist(theta))
-#   2*q - 2*loglik(Y,X,theta)
+#
+# MVSKmod <- function(Y,
+#                     X,
+#                     theta_g = NULL,
+#                     dist,
+#                     stopping = 1e-3,
+#                     max_iter = 50) {
+#   # add mvsk funciton here with error checks, likelihood/aic summary, etc
+#   if(!is.list(Y) | !is.list(X)){
+#     stop("Data not in list format")
+#   } else if (!(dist %in% c("mvgh", "mvvg", "mvnig"))) {
+#     stop("Invalid distribution")
+#   } else if (!is.numeric(stopping)){
+#     stop("Non-numeric stopping value")
+#   } else if (!is.numeric(max_iter) | max_iter < 1){
+#     stop("Invalid max iteration value")
+#   }
+#
+#
+#   # You stopped here
+#   aecm_mvgh(Y,X,theta_g, dist, stopping = stopping, thresh = Inf, iter = max_iter)
+#
 # }
-
-#' AIC for Matrix-Variate Models
-#'
-#' Calculates AIC for MVGH, MVVG, and MVNIG models.
-#'
-#' @param dist Model distribution. Valid arguments are "mvgh", "mvvg", and "mvnig".
-#' @param Y List of \eqn{n_i \times p} response matrices. Matrices must have same number of columns.
-#' @param X List of \eqn{n_i \times q} design matrices. Matrices must have same number of columns.
-#' @param theta List of parameter estimates
-#' @return AIC of the model.
-#' @export
-#' @author Samuel Soon
-#' @author Dipankar Bandyopadhyay
-#' @author Qingyang Liu
-#' @examples
-#' AIC("mvvg", gaad_res, gaad_cov, mvvg_theta)
 
 
 AIC <- function(dist, Y,X,theta){
@@ -1402,23 +1307,6 @@ AIC <- function(dist, Y,X,theta){
   2*q - 2*loglik(Y,X,theta)
 }
 
-
-#' BIC for Matrix-Variate Models
-#'
-#' Calculates BIC for MVGH, MVVG, and MVNIG models.
-#'
-#' @param dist Model distribution. Valid arguments are "mvgh", "mvvg", and "mvnig".
-#' @param Y List of \eqn{n_i \times p} response matrices. Matrices must have same number of columns.
-#' @param X List of \eqn{n_i \times q} design matrices. Matrices must have same number of columns.
-#' @param theta List of parameter estimates
-#' @return BIC of the model.
-#' @export
-#' @author Samuel Soon
-#' @author Dipankar Bandyopadhyay
-#' @author Qingyang Liu
-#' @examples
-#' BIC("mvvg", gaad_res, gaad_cov, mvvg_theta)
-
 BIC <- function(dist, Y,X,theta){
   if(dist == "mvgh"){
     loglik <- q1.mvgh.update
@@ -1435,3 +1323,263 @@ BIC <- function(dist, Y,X,theta){
   n <- sum(ni) * ncol(Y[[1]])
   q*log(n) - 2*loglik(Y,X,theta)
 }
+
+
+
+#' AECM Estimation for Matrix-Variate Variance Gamma Models
+#'
+#' This function fits MVVG linear models for matrix-variate skew data with varying row sizes,
+#'  according to the matrix-variate distributions described by
+#'   (Gallaugher & McNicholas, 2019). Exchangeable observation row correlation
+#'   and skewness structures are imposed to accommodate the varying row counts
+#'   across matrices.
+#'
+#'
+#' @param Y List of \eqn{n_i \times p} response matrices. Matrices must have same number of columns.
+#' @param X List of \eqn{n_i \times q} design matrices. Matrices must have same number of columns.
+#' @param theta_g List of parameters to pass as initial values in the AECM algorithm.
+#'  If NULL, will be randomly generated. See Details for an in-depth explanation.
+#' @param stopping Stopping threshold for the L-infinity norm of differences in consecutive parameter space, evaluated at iteration \eqn{t+1} as
+#' \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty}. Default is 0.001
+#' @param iter Maximum number of iterations, default is 50.
+#' @details
+#' Fits the matrix-variate skew regression model
+#'
+#'  \deqn{Y_i = X_i \Theta + E_i,}
+#'
+#' where each response \eqn{Y_i} is a \eqn{n_i \times p} matrix that indexes \eqn{n_i} observations and \eqn{p} response variables. \eqn{X_i} corresponds to a \eqn{n_i \times q} design matrix, and \eqn{\Theta} corresponds to a \eqn{q \times p} coefficient matrix. \eqn{E_i} corresponds to a \eqn{n_i \times p} error matrix, following a matrix-variate variance-gamma distribution.
+#'
+#' The model estimates MVVG parameters \eqn{\Theta, \underline{a}, r, \Psi, \gamma} using the alternating expectation conditional maximization (AECM) algorithm, using the density
+#'
+#' \deqn{f(Y_i| X_i\Theta,\underline{a},r, \Psi, \gamma, n_i, p) = \dfrac{2\gamma^\gamma \exp[tr(\Sigma_i^{-1}(Y_i- X_i\Theta)\Psi^{-1}A_i^T)]}{(2\pi)^{n_ip/2} |\Sigma_i|^{p/2} |\Psi|^{n_i/2} \Gamma(\gamma)} \bigg( \dfrac{\delta(Y_i;  X_i\Theta, \Sigma_i, \Psi)}{\rho (A_i, \Sigma_i,\Psi) + 2\gamma} \bigg)^{(\gamma - n_ip/2)/2} \\ \times K_{(\gamma - n_ip/2)} \big( \sqrt{[\rho(A_i, \Sigma_i, \Psi) + 2\gamma][\delta(Y_i; X_i\Theta,\Sigma_i,\Psi)]} \big),}
+#'
+#' where \eqn{A_i = \underline{1}_{n_i} \times \underline{a}^T}, \eqn{\Sigma_i = I_{n_i} + r(\underline{1}_{n_i}\underline{1}_{n_i}^T - I_{n_i})},
+#'  \eqn{\delta(X;M, \Sigma, \Psi) = tr(\Sigma^{-1}(X-M)\Psi^{-1}(X-M)^T)}, \eqn{\rho(A, \Sigma, \Psi) = tr(\Sigma^{-1}A\Psi^{-1}A^T)}, and \eqn{K_{\nu}(x)} is the modified Bessel function of the second kind.
+#'
+#' The structure of `theta_g` and parameter estimates returned by the function must be in the form of a list with the following named elements:
+#'
+#' \itemize{
+#'  \item{`Theta`: } {\eqn{q \times p} coefficient matrix}
+#'  \item{`a`: } {\eqn{p \times 1} skewness vector}
+#'  \item{`rho`: } {Compound symmetry parameter for row correlation matrix}
+#'  \item{`Psi`: } {\eqn{p \times p} column covariance matrix}
+#'  \item{`gamma`: } {Univariate mixing parameter}
+#' }
+#'
+#' @return MVVGmod returns a list with the following elements:
+#'
+#' \itemize{
+#'  \item{`Iteration`: } {Number of iterations taken to convergence. `Inf` if convergence not reached.}
+#'  \item{`Starting Value`: } {List of initial parameter values.}
+#'  \item{`Final Value`: } {List of final parameter estimates.}
+#'  \item{`Stopping Criteria`: } {Vector of \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty} at each iteration.}
+#'  \item{`AIC`: } Model AIC
+#'  \item{`BIC`: } Model BIC
+
+#' }
+
+#' @export
+
+#' @author Samuel Soon
+#' @author Dipankar Bandyopadhyay
+#' @author Qingyang Liu
+#'
+#' @examples
+#' set.seed(1234)
+#' # num response variables
+#' p <- ncol(gaad_res[[1]])
+#' # num covariates
+#' q <- ncol(gaad_cov[[1]])
+#' # generate initial value to input, then run AECM with MVVG distribution
+#' initial_mvvg_theta <- list(Theta = matrix(rnorm(p*q), nrow = q, ncol = p),
+#'                       A = rep(1,p),
+#'                      rho = 0.3,
+#'                      Psi = diag(p),
+#'                      gamma = 4)
+#' MVVGmod(gaad_res[1:50], gaad_cov[1:50], initial_mvvg_theta)
+#'
+MVVGmod <- function(Y,
+                    X,
+                    theta_g = NULL,
+                    stopping = 1e-3,
+                    max_iter = 50) {
+  if(!is.list(Y) | !is.list(X)){
+    stop("Data not in list format")
+  } else if (!is.numeric(stopping)){
+    stop("Non-numeric stopping value")
+  } else if (!is.numeric(max_iter) | max_iter < 1){
+    stop("Invalid max iteration value")
+  }
+
+
+  ret <- aecm_mvgh(Y,X,theta_g, "mvvg", stopping = stopping, thresh = Inf, iter = max_iter)
+  c(ret,
+    AIC = AIC("mvvg", Y,X,ret$`Final Value`),
+    BIC = BIC("mvvg", Y,X,ret$`Final Value`))
+
+}
+
+
+#' AECM Estimation for Matrix-Variate Normal-Inverse Gaussian Models
+#'
+#' This function fits MVNIG linear models for matrix-variate skew data with varying row sizes,
+#'  according to the matrix-variate distributions described by
+#'   (Gallaugher & McNicholas, 2019). Exchangeable observation row correlation
+#'   and skewness structures are imposed to accommodate the varying row counts
+#'   across matrices.
+#'
+#'
+#' @param Y List of \eqn{n_i \times p} response matrices. Matrices must have same number of columns.
+#' @param X List of \eqn{n_i \times q} design matrices. Matrices must have same number of columns.
+#' @param theta_g List of parameters to pass as initial values in the AECM algorithm.
+#'  If NULL, will be randomly generated. See Details for an in-depth explanation.
+#' @param stopping Stopping threshold for the L-infinity norm of differences in consecutive parameter space, evaluated at iteration \eqn{t+1} as
+#' \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty}. Default is 0.001
+#' @param iter Maximum number of iterations, default is 50.
+#' @details
+#' Fits the matrix-variate skew regression model
+#'
+#'  \deqn{Y_i = X_i \Theta + E_i,}
+#'
+#' where each response \eqn{Y_i} is a \eqn{n_i \times p} matrix that indexes \eqn{n_i} observations and \eqn{p} response variables. \eqn{X_i} corresponds to a \eqn{n_i \times q} design matrix, and \eqn{\Theta} corresponds to a \eqn{q \times p} coefficient matrix. \eqn{E_i} corresponds to a \eqn{n_i \times p} error matrix, following a matrix-variate variance-gamma distribution.
+#'
+#' The model estimates MVVG parameters \eqn{\Theta, \underline{a}, r, \Psi, \tilde\gamma} using the alternating expectation conditional maximization (AECM) algorithm, using the density
+#'
+#' \deqn{f(Y_i|M_i,\underline{a},r, \Psi, \tilde\gamma, n_i, p) = \dfrac{2 \exp[tr(\Sigma_i^{-1}(Y_i-M_i)\Psi^{-1}A_i^T) + \tilde\gamma]}{(2\pi)^{\frac{n_ip}{2} + 1} |\Sigma_i|^{\frac{p}{2}} |\Psi|^{\frac{n_i}{2}}} \bigg( \dfrac{\delta(Y_i; M_i, \Sigma_i, \Psi) + 1}{\rho (A_i, \Sigma_i,\Psi) + \tilde\gamma^2} \bigg)^{-\frac{(1+n_ip)}{4}} \\ \times K_{-\frac{(1+n_ip)}{2}} \big( \sqrt{[\rho(A_i, \Sigma_i, \Psi) + \tilde\gamma^2][\delta(Y_i;M_i,\Sigma_i,\Psi) + 1]} \big),}
+#'
+#' where \eqn{A_i = \underline{1}_{n_i} \times \underline{a}^T}, \eqn{\Sigma_i = I_{n_i} + r(\underline{1}_{n_i}\underline{1}_{n_i}^T - I_{n_i})},
+#'  \eqn{\delta(X;M, \Sigma, \Psi) = tr(\Sigma^{-1}(X-M)\Psi^{-1}(X-M)^T)}, \eqn{\rho(A, \Sigma, \Psi) = tr(\Sigma^{-1}A\Psi^{-1}A^T)}, and \eqn{K_{\nu}(x)} is the modified Bessel function of the second kind.
+#'
+#' The structure of `theta_g` and parameter estimates returned by the function must be in the form of a list with the following named elements:
+#'
+#' \itemize{
+#'  \item{`Theta`: } {\eqn{q \times p} coefficient matrix}
+#'  \item{`a`: } {\eqn{p \times 1} skewness vector}
+#'  \item{`rho`: } {Compound symmetry parameter for row correlation matrix}
+#'  \item{`Psi`: } {\eqn{p \times p} column covariance matrix}
+#'  \item{`tgamma`: } {Univariate mixing parameter}
+#' }
+#'
+#' @return MVNIGmod returns a list with the following elements:
+#'
+#' \itemize{
+#'  \item{`Iteration`: } {Number of iterations taken to convergence. `Inf` if convergence not reached.}
+#'  \item{`Starting Value`: } {List of initial parameter values.}
+#'  \item{`Final Value`: } {List of final parameter estimates.}
+#'  \item{`Stopping Criteria`: } {Vector of \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty} at each iteration.}
+#'  \item{`AIC`: } Model AIC
+#'  \item{`BIC`: } Model BIC
+
+#' }
+
+#' @export
+
+#' @author Samuel Soon
+#' @author Dipankar Bandyopadhyay
+#' @author Qingyang Liu
+#'
+#' @examples
+#' set.seed(1234)
+#' # num response variables
+#' p <- ncol(gaad_res[[1]])
+#' # num covariates
+#' q <- ncol(gaad_cov[[1]])
+#' # generate initial value to input, then run AECM with MVVG distribution
+#' initial_mvnig_theta <- list(Theta = matrix(rnorm(p*q), nrow = q, ncol = p),
+#'                       A = rep(1,p),
+#'                      rho = 0.3,
+#'                      Psi = diag(p),
+#'                      tgamma = 4)
+#' MVNIGmod(gaad_res[1:50], gaad_cov[1:50], initial_mvnig_theta)
+#'
+MVNIGmod <- function(Y,
+                    X,
+                    theta_g = NULL,
+                    stopping = 1e-3,
+                    max_iter = 50) {
+  if(!is.list(Y) | !is.list(X)){
+    stop("Data not in list format")
+  } else if (!is.numeric(stopping)){
+    stop("Non-numeric stopping value")
+  } else if (!is.numeric(max_iter) | max_iter < 1){
+    stop("Invalid max iteration value")
+  }
+
+
+  ret <- aecm_mvgh(Y,X,theta_g, "mvnig", stopping = stopping, thresh = Inf, iter = max_iter)
+  c(ret,
+    AIC = AIC("mvnig", Y,X,ret$`Final Value`),
+    BIC = BIC("mvnig", Y,X,ret$`Final Value`))
+
+}
+
+mv_predict <- function(X,theta, dist){
+  Theta <- theta$Theta
+  A <- theta$A
+  mixparams <- theta[-(1:4)]
+
+  if(dist == "mvgh"){
+    mix_ev <- besselRatio(mixparams$omega, nu = mixparams$lambda, orderDiff = 1)
+  }else if(dist == "mvvg"){
+    mix_ev <- 1
+  }else if(dist == "mvnig"){
+    mix_ev <- 1/mixparams$tgamma
+  }
+  ret <- list()
+  for(i in 1:length(X)){
+    Xi <- X[[i]]
+    ni <- nrow(Xi)
+    Mi <- Xi %*% Theta
+    Ai <- a.mat(ni, A)
+    pred_i <- Mi + Ai * mix_ev
+    ret <- c(ret, list(pred_i))
+  }
+
+  ret
+}
+
+
+#' MVSK Model Prediction
+#'
+#' Predicts response values given a list of covariate matrices and a model output from either MVVGmod or MVNIGmod.
+#'
+#'
+#' @param X Inputted covariate matrix
+#' @param mod object outputted by either MVVGmod or MVNIGmod
+
+
+#' @export
+
+#' @author Samuel Soon
+#' @author Dipankar Bandyopadhyay
+#' @author Qingyang Liu
+#'
+#' @examples
+#' set.seed(1234)
+#' # num response variables
+#' p <- ncol(gaad_res[[1]])
+#' # num covariates
+#' q <- ncol(gaad_cov[[1]])
+#' # generate initial value to input, then run AECM with MVVG distribution
+#' initial_mvnig_theta <- list(Theta = matrix(rnorm(p*q), nrow = q, ncol = p),
+#'                       A = rep(1,p),
+#'                      rho = 0.3,
+#'                      Psi = diag(p),
+#'                      tgamma = 4)
+#' mvnig_mod <- MVNIGmod(gaad_res[1:50], gaad_cov[1:50], initial_mvnig_theta)
+#'
+#' predict(mvnig_mod, gaad_cov[1:50])
+predict <- function(mod,X){
+  theta <- mod$`Final Value`
+  if(!is.null(theta$gamma)){
+    mv_predict(X, theta, "mvvg")
+  }else{
+    mv_predict(X, theta, "mvnig")
+  }
+}
+
+# mod_aic <- function(loglik, Y,X,theta){
+#   q <- length(unlist(theta))
+#   2*q - 2*loglik(Y,X,theta)
+# }
+
