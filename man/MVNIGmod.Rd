@@ -17,18 +17,18 @@ If NULL, will be randomly generated. See Details for an in-depth explanation.}
 \item{stopping}{Stopping threshold for the L-infinity norm of differences in consecutive parameter space, evaluated at iteration \eqn{t+1} as
 \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty}. Default is 0.001}
 
-\item{iter}{Maximum number of iterations, default is 50.}
+\item{max_iter}{Maximum number of iterations, default is 50.}
 }
 \value{
 MVNIGmod returns a list with the following elements:
 
-\itemize{
-\item{\code{Iteration}: } {Number of iterations taken to convergence. \code{Inf} if convergence not reached.}
-\item{\verb{Starting Value}: } {List of initial parameter values.}
-\item{\verb{Final Value}: } {List of final parameter estimates.}
-\item{\verb{Stopping Criteria}: } {Vector of \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty} at each iteration.}
-\item{\code{AIC}: } Model AIC
-\item{\code{BIC}: } Model BIC
+\describe{
+\item{\code{Iteration}: }{Number of iterations taken to convergence. \code{Inf} if convergence not reached.}
+\item{\verb{Starting Value}: }{List of initial parameter values.}
+\item{\verb{Final Value}: }{List of final parameter estimates.}
+\item{\verb{Stopping Criteria}: }{Vector of \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty} at each iteration.}
+\item{\code{AIC}: }{Model AIC}
+\item{\code{BIC}: }{Model BIC}
 }
 }
 \description{
@@ -47,34 +47,34 @@ where each response \eqn{Y_i} is a \eqn{n_i \times p} matrix that indexes \eqn{n
 
 The model estimates MVVG parameters \eqn{\Theta, \underline{a}, r, \Psi, \tilde\gamma} using the alternating expectation conditional maximization (AECM) algorithm, using the density
 
-\deqn{f(Y_i|M_i,\underline{a},r, \Psi, \tilde\gamma, n_i, p) = \dfrac{2 \exp[tr(\Sigma_i^{-1}(Y_i-M_i)\Psi^{-1}A_i^T) + \tilde\gamma]}{(2\pi)^{\frac{n_ip}{2} + 1} |\Sigma_i|^{\frac{p}{2}} |\Psi|^{\frac{n_i}{2}}} \bigg( \dfrac{\delta(Y_i; M_i, \Sigma_i, \Psi) + 1}{\rho (A_i, \Sigma_i,\Psi) + \tilde\gamma^2} \bigg)^{-\frac{(1+n_ip)}{4}} \\ \times K_{-\frac{(1+n_ip)}{2}} \big( \sqrt{[\rho(A_i, \Sigma_i, \Psi) + \tilde\gamma^2][\delta(Y_i;M_i,\Sigma_i,\Psi) + 1]} \big),}
+\deqn{f(Y_i|M_i,\underline{a},r, \Psi, \tilde\gamma, n_i, p) = \dfrac{2 \exp[matlib::tr(\Sigma_i^{-1}(Y_i-M_i)\Psi^{-1}A_i^T) + \tilde\gamma]}{(2\pi)^{\frac{n_ip}{2} + 1} |\Sigma_i|^{\frac{p}{2}} |\Psi|^{\frac{n_i}{2}}} \bigg( \dfrac{\delta(Y_i; M_i, \Sigma_i, \Psi) + 1}{\rho (A_i, \Sigma_i,\Psi) + \tilde\gamma^2} \bigg)^{-\frac{(1+n_ip)}{4}} \\ \times K_{-\frac{(1+n_ip)}{2}} \big( \sqrt{[\rho(A_i, \Sigma_i, \Psi) + \tilde\gamma^2][\delta(Y_i;M_i,\Sigma_i,\Psi) + 1]} \big),}
 
 where \eqn{A_i = \underline{1}_{n_i} \times \underline{a}^T}, \eqn{\Sigma_i = I_{n_i} + r(\underline{1}_{n_i}\underline{1}_{n_i}^T - I_{n_i})},
-\eqn{\delta(X;M, \Sigma, \Psi) = tr(\Sigma^{-1}(X-M)\Psi^{-1}(X-M)^T)}, \eqn{\rho(A, \Sigma, \Psi) = tr(\Sigma^{-1}A\Psi^{-1}A^T)}, and \eqn{K_{\nu}(x)} is the modified Bessel function of the second kind.
+\eqn{\delta(X;M, \Sigma, \Psi) = matlib::tr(\Sigma^{-1}(X-M)\Psi^{-1}(X-M)^T)}, \eqn{\rho(A, \Sigma, \Psi) = matlib::tr(\Sigma^{-1}A\Psi^{-1}A^T)}, and \eqn{K_{\nu}(x)} is the modified Bessel function of the second kind.
 
 The structure of \code{theta_g} and parameter estimates returned by the function must be in the form of a list with the following named elements:
 
-\itemize{
-\item{\code{Theta}: } {\eqn{q \times p} coefficient matrix}
-\item{\code{a}: } {\eqn{p \times 1} skewness vector}
-\item{\code{rho}: } {Compound symmetry parameter for row correlation matrix}
-\item{\code{Psi}: } {\eqn{p \times p} column covariance matrix}
-\item{\code{tgamma}: } {Univariate mixing parameter}
+\describe{
+\item{\code{Theta}: }{\eqn{q \times p} coefficient matrix}
+\item{\code{a}: }{\eqn{p \times 1} skewness vector}
+\item{\code{rho}: }{Compound symmetry parameter for row correlation matrix}
+\item{\code{Psi}: }{\eqn{p \times p} column covariance matrix}
+\item{\code{tgamma}: }{Univariate mixing parameter}
 }
 }
 \examples{
-set.seed(1234)
+\dontrun{set.seed(1234)
 # num response variables
 p <- ncol(gaad_res[[1]])
 # num covariates
 q <- ncol(gaad_cov[[1]])
 # generate initial value to input, then run AECM with MVVG distribution
-initial_mvnig_theta <- list(Theta = matrix(rnorm(p*q), nrow = q, ncol = p),
+initial_mvnig_theta <- list(Theta = matrix(stats::rnorm(p*q), nrow = q, ncol = p),
                       A = rep(1,p),
                      rho = 0.3,
                      Psi = diag(p),
-                     tgamma = 4)
-MVNIGmod(gaad_res[1:50], gaad_cov[1:50], initial_mvnig_theta)
+                     tgamma = 3)
+MVNIGmod(gaad_res[1:30], gaad_cov[1:30], initial_mvnig_theta)}
 
 }
 \author{

@@ -1,28 +1,28 @@
-pacman::p_load(
-  MatrixMixtures,
-  tidyverse,
-  Rcpp,
-  sn,
-  clusterGeneration,
-  rmutil,
-  MixMatrix,
-  matlib,
-  rootSolve,
-  DistributionUtils,
-  Bessel,
-  pracma,
-  maxLik,
-  GeneralizedHyperbolic,
-  truncnorm,
-  SSLASSO,
-  mvtnorm,
-  parallel
-)
+# library(MatrixMixtures        )
+library(dplyr             )
+library(purrr             )
+library(tidyr)
+
+# library(Rcpp                  )
+# library(sn                    )
+library(clusterGeneration     )
+# library(rmutil                )
+# library(MixMatrix             )
+library(matlib                )
+# library(rootSolve             )
+library(DistributionUtils     )
+library(Bessel                )
+library(pracma                )
+library(maxLik                )
+# library(GeneralizedHyperbolic )
+library(truncnorm             )
+# library(mvtnorm               )
+library(parallel              )
 
 # turns unlisted vector into formatted list according to how i do distributions
-reconstitute <- function(unlisted, nparams, nresp, extra_names = NULL){
+reconstitute <- function(unlisted, nparams, nresp, extra_names = NULL) {
   lst <- unlisted
-  thetalen <- 1:(nparams*nresp)
+  thetalen <- 1:(nparams * nresp)
   alen <- 1:nresp
   rholen <- 1:1
   psilen <- 1:(nresp^2)
@@ -34,10 +34,15 @@ reconstitute <- function(unlisted, nparams, nresp, extra_names = NULL){
   lst <- lst[-c(rholen)]
   Psi <- matrix(lst[psilen], nresp, nresp)
   lst <- lst[-c(psilen)]
-  ret <- list("Theta" = Theta, "A" = A, "rho" =  rho, "Psi" = Psi)
+  ret <- list(
+    "Theta" = Theta,
+    "A" = A,
+    "rho" =  rho,
+    "Psi" = Psi
+  )
   # browser()
   ret2 <- as.list(lst)
-  if(!is.null(extra_names)){
+  if (!is.null(extra_names)) {
     names(ret2) <- extra_names
   }
   c(ret, ret2)
@@ -47,15 +52,14 @@ reconstitute <- function(unlisted, nparams, nresp, extra_names = NULL){
 
 # take abs of nu since nuAsym is weird
 besselK.adj <- function(x, nu, k.max = 5, exp = FALSE) {
-
-  if(!is.numeric(abs(nu))){
+  if (!is.numeric(abs(nu))) {
     print(paste("ASD", abs(nu)))
   }
   if (abs(nu) >= 30 & x >= 300) {
-    return(besselK.nuAsym(x, abs(nu), k.max, exp))
+    return(Bessel::besselK.nuAsym(x, abs(nu), k.max, exp))
   }
   else if (x >= 100) {
-    return(besselKasym(x, abs(nu), k.max, exp))
+    return(Bessel::besselKasym(x, abs(nu), k.max, exp))
   }
   else{
     return(besselK(x, nu, exp))
@@ -78,15 +82,14 @@ lbesselK <- function(x, nu) {
 ldbesselK_lambda <- function(x, nu) {
   # helper just to get nu to be first argument
 
-  rev <- function(nu,
-                  x) {
+  rev <- function(nu, x) {
     lbesselK(x, nu)
   }
 
   # order derivative of besselK
   numer <-
     tryCatch(
-      numderiv(rev, x0 = nu, x = x),
+      pracma::numderiv(rev, x0 = nu, x = x),
       error = function(e) {
         print(c(x, nu))
       }
@@ -105,10 +108,11 @@ ldbesselK_lambda <- function(x, nu) {
     numer$df / denom
   }
   else{
-    numderiv(rev,
+    pracma::numderiv(rev,
              x0 = nu,
              x = x,
-             exp = TRUE,)$df / denom
+             exp = TRUE,
+    )$df / denom
   }
 
 }
@@ -116,7 +120,7 @@ ldbesselK_lambda <- function(x, nu) {
 # derivative of log besselK wrt x
 ldbesselK_omega <- function(x, nu) {
   brat <- besselK.adj(x, nu - 1, 5, TRUE) / besselK.adj(x, nu, 5, TRUE)
-  -besselRatio(x, nu, -1) - nu/x
+  - DistributionUtils::besselRatio(x, nu, -1) - nu / x
   # -brat - nu / x
 
   #dbesselK_omega(x, nu)/besselK.adj(x, nu)
@@ -127,7 +131,7 @@ ldbesselK_omega <- function(x, nu) {
 # construct n_i x n_i CS matrix from rho
 csform <- function(ni, rho, inv = FALSE) {
   i <- diag(ni)
-  j <- matrix(rep(1, ni ^ 2), ni, ni)
+  j <- matrix(rep(1, ni^2), ni, ni)
   ret <- c()
   if (inv) {
     ret <- 1 / (1 - rho) * (i - rho / (1 - rho + ni * rho) * j)
@@ -140,7 +144,7 @@ csform <- function(ni, rho, inv = FALSE) {
 
 # closed form determinant of compound symmetric matrix
 sigma_det <- function(ni, rho) {
-  ret <- (1 - rho) ^ ni * (1 + ni * rho / (1 - rho))
+  ret <- (1 - rho)^ni * (1 + ni * rho / (1 - rho))
   ret
 }
 
@@ -159,14 +163,14 @@ a.mat <- function(ni, a) {
 # Invert covariance matrices before passing
 # A should be a matrix
 rhofun <- function(A, Sigma_inv, Psi_inv) {
-  tr(Sigma_inv %*% A %*% Psi_inv %*% t(A))
+  matlib::tr(Sigma_inv %*% A %*% Psi_inv %*% t(A))
 }
 
 # Gallaugher's Delta given in his paper
 # Invert cov matrices before passing
 deltafun <- function(Y, X, Theta, Sigma_inv, Psi_inv) {
   loc <- (Y - X %*% Theta)
-  tr(Sigma_inv %*% loc %*% Psi_inv %*% t(loc))
+  matlib::tr(Sigma_inv %*% loc %*% Psi_inv %*% t(loc))
   #t(vec(loc)) %*% (Psi_inv %x% Sigma_inv)  %*% vec(loc)
 }
 
@@ -175,7 +179,7 @@ deltafun <- function(Y, X, Theta, Sigma_inv, Psi_inv) {
 # A should be matrix
 bilinform <- function(Y, X, A, Theta, Sigma_inv, Psi_inv) {
   loc <- (Y - X %*% Theta)
-  tr(Sigma_inv %*% loc %*% Psi_inv %*% t(A))
+  matlib::tr(Sigma_inv %*% loc %*% Psi_inv %*% t(A))
   #t(vec(A)) %*% (Psi_inv %x% Sigma_inv) %*% vec(loc)
 }
 
@@ -184,11 +188,11 @@ bilinform <- function(Y, X, A, Theta, Sigma_inv, Psi_inv) {
 # p -> number of response columns
 # q -> number of covariates in coefficient matrix
 genRandomTheta <- function(p, q, dist = "mvgh") {
-  Theta <- matrix(rnorm(q * p), q, p) * runif(1, 0, 3)
-  A <- matrix(rnorm(p) * runif(1, 0, 5), ncol =1)
-  rho <- rtruncnorm(1, 0, 0.98, .5, .5)
-  Psi <- genPositiveDefMat(p)$Sigma
-  Psi <- Psi/(det(Psi)^(1/p))
+  Theta <- matrix(stats::rnorm(q * p), q, p) * stats::runif(1, 0, 3)
+  A <- matrix(stats::rnorm(p) * stats::runif(1, 0, 5), ncol = 1)
+  rho <- truncnorm::rtruncnorm(1, 0, 0.98, .5, .5)
+  Psi <- clusterGeneration::genPositiveDefMat()(p)$Sigma
+  Psi <- Psi / (det(Psi)^(1 / p))
 
   baseparams <- list(
     Theta = Theta,
@@ -198,16 +202,16 @@ genRandomTheta <- function(p, q, dist = "mvgh") {
 
   )
   mix <- list()
-  if(dist == "mvgh"){
-    mix <- list(lambda = rgamma(1,5), omega = rgamma(1,3,3))
+  if (dist == "mvgh") {
+    mix <- list(lambda = stats::rgamma(1, 5), omega = stats::rgamma(1, 3, 3))
   }
-  else if(dist == "mvvg"){
-    mix <- list(gamma = rgamma(1,3,3))
+  else if (dist == "mvvg") {
+    mix <- list(gamma = stats::rgamma(1, 3, 3))
   }
-  else if(dist == "mvnig"){
-    mix <- list(tgamma = rgamma(1,3,3))
+  else if (dist == "mvnig") {
+    mix <- list(tgamma = stats::rgamma(1, 3, 3))
   }
-  else if(dist == "mvcn"){
+  else if (dist == "mvcn") {
 
   }
 
@@ -238,7 +242,7 @@ mvgh.ui_update <- function(Yi, Xi, theta) {
   order <- theta$lambda - ni * p / 2
 
   ret <-
-    1 / sqrt(delta + theta$omega) * besselRatio(rho + theta$omega, order, 1)
+    1 / sqrt(delta + theta$omega) * DistributionUtils::besselRatio(rho + theta$omega, order, 1)
 
   ret
 
@@ -274,8 +278,8 @@ mvgh.xii_update <- function(Yi, Xi, theta) {
   delta <- deltafun(Yi, Xi, theta$Theta, Sigma_inv, Psi_inv)
   order <- theta$lambda - ni * p / 2
 
-  # numer <- besselKAsym(rho + theta$omega, order, 10, TRUE)
-  # denom <- numderiv(function(nu, x){besselKasym(x, nu, 10, TRUE)}, x0 = order, x= rho + theta$omega)-0.5 *
+  # numer <- Bessel::besselKasym(rho + theta$omega, order, 10, TRUE)
+  # denom <- pracma::numderiv(function(nu, x){Bessel::besselKasym(x, nu, 10, TRUE)}, x0 = order, x= rho + theta$omega)-0.5 *
   log(delta + theta$omega) + ldbesselK_lambda(rho + theta$omega, order)
   # -0.5*log(delta + theta$omega) + numer/denom
 
@@ -284,7 +288,7 @@ mvgh.xii_update <- function(Yi, Xi, theta) {
 ## log-likelihood updating functions (Q-function updates)
 
 # raw log likelihood mvgh update for single subject
-q1i.mvgh.update <- function(Yi, Xi, theta){
+q1i.mvgh.update <- function(Yi, Xi, theta) {
   ni <- nrow(Yi)
   p <- ncol(Yi)
   Sigma_inv <- csform(ni, theta$rho, TRUE)
@@ -295,22 +299,22 @@ q1i.mvgh.update <- function(Yi, Xi, theta){
   rhopw <- rho + theta$omega
   deltapw <- delta + theta$omega
   bln <- bilinform(Yi, Xi, amat, theta$Theta, Sigma_inv, Psi_inv)
-  order <- theta$lambda - ni*p/2
+  order <- theta$lambda - ni * p / 2
   dt <- sigma_det(ni, theta$rho)
 
   bln -
-    ni * p/2 * log(2*pi) -
-    (p/2)*log(dt) -
-    (ni/2)*log(det(theta$Psi)) -
+    ni * p / 2 * log(2 * pi) -
+    (p / 2) * log(dt) -
+    (ni / 2) * log(det(theta$Psi)) -
     log(besselK.adj(theta$omega, theta$lambda)) +
-    (order/2)*(log(deltapw) - log(rhopw)) +
-    lbesselK(sqrt(rhopw*deltapw), order)
+    (order / 2) * (log(deltapw) - log(rhopw)) +
+    lbesselK(sqrt(rhopw * deltapw), order)
 
 
 }
 
 # raw log likelihood mvvg update for single subject
-q1i.mvvg.update <- function(Yi, Xi, theta){
+q1i.mvvg.update <- function(Yi, Xi, theta) {
   ni <- nrow(Yi)
   p <- ncol(Yi)
   Sigma_inv <- csform(ni, theta$rho, TRUE)
@@ -318,25 +322,25 @@ q1i.mvvg.update <- function(Yi, Xi, theta){
   amat <- a.mat(ni, theta$A)
   rho <- rhofun(amat, Sigma_inv, Psi_inv)
   delta <- deltafun(Yi, Xi, theta$Theta, Sigma_inv, Psi_inv)
-  rhopw <- rho + 2*theta$gamma
+  rhopw <- rho + 2 * theta$gamma
   deltapw <- delta
   bln <- bilinform(Yi, Xi, amat, theta$Theta, Sigma_inv, Psi_inv)
-  order <- (theta$gamma - ni*p/2)
+  order <- (theta$gamma - ni * p / 2)
   dt <- sigma_det(ni, theta$rho)
 
-  log(2) + theta$gamma*log(theta$gamma) + bln -
-    ni * p/2 * log(2*pi) -
-    (p/2)*log(dt) -
-    (ni/2)*log(det(theta$Psi)) -
+  log(2) + theta$gamma * log(theta$gamma) + bln -
+    ni * p / 2 * log(2 * pi) -
+    (p / 2) * log(dt) -
+    (ni / 2) * log(det(theta$Psi)) -
     lgamma(theta$gamma) +
-    (order/2)*(log(deltapw) - log(rhopw)) +
-    lbesselK(sqrt(rhopw*deltapw), order)
+    (order / 2) * (log(deltapw) - log(rhopw)) +
+    lbesselK(sqrt(rhopw * deltapw), order)
 
 
 }
 
 # raw log likelihood mvnig update for single subject
-q1i.mvnig.update <- function(Yi, Xi, theta){
+q1i.mvnig.update <- function(Yi, Xi, theta) {
   ni <- nrow(Yi)
   p <- ncol(Yi)
   Sigma_inv <- csform(ni, theta$rho, TRUE)
@@ -347,51 +351,45 @@ q1i.mvnig.update <- function(Yi, Xi, theta){
   rhopw <- rho + theta$tgamma^2
   deltapw <- delta + 1
   bln <- bilinform(Yi, Xi, amat, theta$Theta, Sigma_inv, Psi_inv) + theta$tgamma
-  order <- -(1 + ni*p)/2
+  order <- -(1 + ni * p) / 2
   dt <- sigma_det(ni, theta$rho)
 
-  log(2/(2*pi)) + bln -
-    ni * p/2 * log(2*pi) -
-    (p/2)*log(dt) -
-    (ni/2)*log(det(theta$Psi)) +
-    (order/2)*(log(deltapw) - log(rhopw)) +
-    lbesselK(sqrt(rhopw*deltapw), order)
+  log(2 / (2 * pi)) + bln -
+    ni * p / 2 * log(2 * pi) -
+    (p / 2) * log(dt) -
+    (ni / 2) * log(det(theta$Psi)) +
+    (order / 2) * (log(deltapw) - log(rhopw)) +
+    lbesselK(sqrt(rhopw * deltapw), order)
 
 
 }
 
 # update Q1 over all subjects
-q1.mvgh.update <- function(Y, X, theta){
+q1.mvgh.update <- function(Y, X, theta) {
   ret <- 0
   for (i in 1:length(Y)) {
     ret <-
-      ret + q1i.mvgh.update(Y[[i]],
-                            X[[i]],
-                            theta)
+      ret + q1i.mvgh.update(Y[[i]], X[[i]], theta)
   }
 
   ret
 }
 
-q1.mvvg.update <- function(Y,X,theta){
+q1.mvvg.update <- function(Y, X, theta) {
   ret <- 0
   for (i in 1:length(Y)) {
     ret <-
-      ret + q1i.mvvg.update(Y[[i]],
-                            X[[i]],
-                            theta)
+      ret + q1i.mvvg.update(Y[[i]], X[[i]], theta)
   }
 
   ret
 }
 
-q1.mvnig.update <- function(Y,X,theta){
+q1.mvnig.update <- function(Y, X, theta) {
   ret <- 0
   for (i in 1:length(Y)) {
     ret <-
-      ret + q1i.mvnig.update(Y[[i]],
-                             X[[i]],
-                             theta)
+      ret + q1i.mvnig.update(Y[[i]], X[[i]], theta)
   }
 
   ret
@@ -418,7 +416,7 @@ q2i.mvgh.update <- function(Yi, Xi, ui, zetai, xii, theta) {
   t7 <- 0.5 * (t7a + t7b)
   # if (sum(is.nan(c(t1, t2, t3, t4, t5, t6, t7)))) {
   #   browser()
-  # }
+  #}
   t1 - t2 - t3 - t4 - t5 + t6 - t7
 }
 
@@ -443,7 +441,7 @@ q2.mvgh.update <- function(Y, X, latentvars, theta) {
 
 # proposed stopping condition:
 # Compute L-infinity norm of theta
-linf <- function(theta, prev){
+linf <- function(theta, prev) {
   #max(abs(unlist(theta)))
   max(abs(unlist(theta) - unlist(prev)))
 }
@@ -471,23 +469,29 @@ lat.update <- function(Y, X, theta, dist) {
     delta <- deltafun(Yi, Xi, theta$Theta, Sigma_inv, Psi_inv)
 
 
-    a <- switch(dist,
-                "mvgh" = rho + theta$omega,
-                "mvvg" = rho + 2*theta$gamma,
-                "mvnig" = rho + (theta$tgamma)^2)
-    b <- switch(dist,
-                "mvgh" = delta + theta$omega,
-                "mvvg" = delta,
-                "mvnig" = delta + 1)
-    order <- switch(dist,
-                    "mvgh" = theta$lambda - ni * p / 2,
-                    "mvvg" = theta$gamma - ni*p/2,
-                    "mvnig" = -(1 + ni * p)/2)
+    a <- switch(
+      dist,
+      "mvgh" = rho + theta$omega,
+      "mvvg" = rho + 2 * theta$gamma,
+      "mvnig" = rho + (theta$tgamma)^2
+    )
+    b <- switch(
+      dist,
+      "mvgh" = delta + theta$omega,
+      "mvvg" = delta,
+      "mvnig" = delta + 1
+    )
+    order <- switch(
+      dist,
+      "mvgh" = theta$lambda - ni * p / 2,
+      "mvvg" = theta$gamma - ni * p / 2,
+      "mvnig" = -(1 + ni * p) / 2
+    )
     x <- sqrt(a * b)
 
     # latent vars for subject i
-    ui <- sqrt(b / a) * besselRatio(x, order, 1)
-    zetai <- sqrt(a / b) * besselRatio(x, order, 1) - 2 * order / b
+    ui <- sqrt(b / a) * DistributionUtils::besselRatio(x, order, 1)
+    zetai <- sqrt(a / b) * DistributionUtils::besselRatio(x, order, 1) - 2 * order / b
     xii <- log(sqrt(b / a)) + ldbesselK_lambda(x, order)
 
     ret$u <- c(ret$u, ui)
@@ -595,12 +599,12 @@ rho.mvgh.logl <- function(rho, Y, X, params) {
 
     # if(is.nan(s1)){
     #   browser()
-    # }
+    #}
 
     ## trying to exp and then adjust on the log scale
     x <- sqrt((rho2 + theta$omega) * (delta + theta$omega))
     s4 <- s4 + lbesselK(x, order)
-    if(sum(is.infinite(c(s1,s2,s3,s4)))){
+    if (sum(is.infinite(c(s1, s2, s3, s4)))) {
       browser()
     }
   }
@@ -612,7 +616,6 @@ rho.mvgh.logl <- function(rho, Y, X, params) {
 # update rho, the compound symmetry parameter
 # uses raw likelihood
 rho.mvgh.update <- function(Y, X, latentvars, theta) {
-
   # NM sends warnings
   # rho is constrained to prevent singularities
   theta$rho <-
@@ -741,14 +744,14 @@ omega.logl <- function(mix, parms) {
 
     # if (sum(is.nan(c(s1, s2, s3)))) {
     #   browser()
-    # }
+    #}
   }
 
   s1 - s2 + s3
 }
 
 
-lambda.score <- function(mix, parms){
+lambda.score <- function(mix, parms) {
   # inits
   lambda <- mix[1]
   Y <- parms[[1]]
@@ -789,8 +792,7 @@ lambda.score <- function(mix, parms){
 }
 
 omega.score <- function(mix, parms) {
-
-  #return(numderiv(omega.logl, mix[1], parms = parms)$df)
+  #return(pracma::numderiv(omega.logl, mix[1], parms = parms)$df)
   # inits
   omega <- mix[1]
   Y <- parms[[1]]
@@ -818,13 +820,14 @@ omega.score <- function(mix, parms) {
     order <- theta$lambda - ni * p / 2
     x <- sqrt(rhopw * deltapw)
 
-    s1 <- s1 + ldbesselK_omega(x, order) * (rho + delta + 2*omega) / (2*x)
-    s3 <- s3 + (order / 2) * (1/deltapw - 1/rhopw)
+    s1 <- s1 + ldbesselK_omega(x, order) * (rho + delta + 2 * omega) / (2 *
+                                                                          x)
+    s3 <- s3 + (order / 2) * (1 / deltapw - 1 / rhopw)
 
 
     # if (sum(is.nan(c(s1, s2, s3)))) {
     #   browser()
-    # }
+    #}
   }
 
   s1 - s2 + s3
@@ -837,16 +840,18 @@ omega.score <- function(mix, parms) {
 lambda.update <- function(Y, X, latentvars, theta) {
   #return(theta)
 
-  parms <- list(Y,X,theta)
+  parms <- list(Y, X, theta)
   est <-
-    suppressWarnings(maxLik::maxLik(
-      lambda.logl,
-      grad = lambda.score,
-      start = theta$lambda,
-      method = "BFGS",
-      parms = parms,
-      constraints=list(ineqA=matrix(c(-1,1),2,1), ineqB=c(10,10))
-    )$estimate)
+    suppressWarnings(
+      maxLik::maxLik(
+        lambda.logl,
+        grad = lambda.score,
+        start = theta$lambda,
+        method = "BFGS",
+        parms = parms,
+        constraints = list(ineqA = matrix(c(-1, 1), 2, 1), ineqB = c(10, 10))
+      )$estimate
+    )
   #browser()
 
   #print(theta$lambda)
@@ -859,17 +864,19 @@ lambda.update <- function(Y, X, latentvars, theta) {
 # update omega using raw likelihood
 omega.update <- function(Y, X, latentvars, theta) {
   #return(theta)
-  parms <- list(Y,X,theta)
+  parms <- list(Y, X, theta)
   theta$omega <-
 
-    suppressWarnings(maxLik::maxLik(
-      omega.logl,
-      grad = omega.score,
-      start = theta$omega,
-      method = "BFGS",
-      parms = parms,
-      constraints=list(ineqA=matrix(c(1,-1), 2,1), ineqB=c(0,10))
-    )$estimate)
+    suppressWarnings(
+      maxLik::maxLik(
+        omega.logl,
+        grad = omega.score,
+        start = theta$omega,
+        method = "BFGS",
+        parms = parms,
+        constraints = list(ineqA = matrix(c(1, -1), 2, 1), ineqB = c(0, 10))
+      )$estimate
+    )
 
   theta
 }
@@ -878,7 +885,7 @@ omega.update <- function(Y, X, latentvars, theta) {
 
 # test both update functions then run aecm then sims
 
-rho.mvvg.logl <- function(rho, Y, X, params){
+rho.mvvg.logl <- function(rho, Y, X, params) {
   theta <- params
   N <- length(Y)
   p <- ncol(Y[[1]])
@@ -889,7 +896,7 @@ rho.mvvg.logl <- function(rho, Y, X, params){
   s3 <- 0
   s4 <- 0
 
-  for(i in 1:N) {
+  for (i in 1:N) {
     Yi <- Y[[i]]
     Xi <- X[[i]]
     ni <- nrow(Yi)
@@ -900,13 +907,13 @@ rho.mvvg.logl <- function(rho, Y, X, params){
     rho2 <- rhofun(amat, Sigma_inv, Psi_inv)
     delta <- deltafun(Yi, Xi, theta$Theta, Sigma_inv, Psi_inv)
     bln <- bilinform(Yi, Xi, amat, theta$Theta, Sigma_inv, Psi_inv)
-    order <-  theta$gamma - ni * p/2
-    rhopg <- rho2 + 2*(theta$gamma)
+    order <-  theta$gamma - ni * p / 2
+    rhopg <- rho2 + 2 * (theta$gamma)
 
     s1 <- s1 + bln
-    s2 <- s2 + p/2 * log(sigma_det(ni, rho))
-    s3 <- s3 + order/2 * (log(delta) - log(rhopg))
-    s4 <- s4 + lbesselK(sqrt(delta * rhopg),order)
+    s2 <- s2 + p / 2 * log(sigma_det(ni, rho))
+    s3 <- s3 + order / 2 * (log(delta) - log(rhopg))
+    s4 <- s4 + lbesselK(sqrt(delta * rhopg), order)
 
   }
   # s4 plus since order is negative
@@ -930,7 +937,7 @@ rho.mvvg.update <- function(Y, X, latentvars, theta) {
   theta
 }
 
-gamma_logl <- function(mix, parms){
+gamma_logl <- function(mix, parms) {
   # inits
   gamma <- mix[1]
   Y <- parms[[1]]
@@ -940,8 +947,8 @@ gamma_logl <- function(mix, parms){
   p <- ncol(Y[[1]])
 
   # components of sum
-  s1 <- N* gamma * log(gamma)
-  s2 <- N*lgamma(gamma)
+  s1 <- N * gamma * log(gamma)
+  s2 <- N * lgamma(gamma)
   s3 <- 0
   s4 <- 0
 
@@ -954,22 +961,22 @@ gamma_logl <- function(mix, parms){
     rho <- rhofun(amat, Sigma_inv, Psi_inv)
     delta <-
       deltafun(Y[[i]], X[[i]], theta$Theta, Sigma_inv, Psi_inv)
-    rhopg <- rho + 2*gamma
+    rhopg <- rho + 2 * gamma
     order <- gamma - ni * p / 2
 
-    s3 <- s3 + order/2 * (log(delta) - log(rhopg))
-    s4 <- s4 + lbesselK(sqrt(delta * rhopg),order)
+    s3 <- s3 + order / 2 * (log(delta) - log(rhopg))
+    s4 <- s4 + lbesselK(sqrt(delta * rhopg), order)
 
 
     # if (sum(is.nan(c(s1, s2, s3)))) {
     #   browser()
-    # }
+    #}
   }
 
   s1 - s2 + s3 + s4
 }
 
-gamma_update <- function(Y, X, latentvars, theta){
+gamma_update <- function(Y, X, latentvars, theta) {
   #return(theta)
   theta$gamma <-
 
@@ -1004,7 +1011,7 @@ rho.mvnig.logl <- function(rho, Y, X, params) {
   s4 <- 0
   s5 <- 0
 
-  for(i in 1:N) {
+  for (i in 1:N) {
     Yi <- Y[[i]]
     Xi <- X[[i]]
     ni <- nrow(Yi)
@@ -1015,21 +1022,21 @@ rho.mvnig.logl <- function(rho, Y, X, params) {
     rho2 <- rhofun(amat, Sigma_inv, Psi_inv)
     delta <- deltafun(Yi, Xi, theta$Theta, Sigma_inv, Psi_inv)
     bln <- bilinform(Yi, Xi, amat, theta$Theta, Sigma_inv, Psi_inv)
-    order <- - (1 + ni * p)/2
+    order <- -(1 + ni * p) / 2
     deltap1 <- delta + 1
     rhopg <- rho2 + (theta$tgamma)^2
 
     s1 <- s1 + bln
-    s3 <- s3 + p/2 * log(sigma_det(ni, rho))
-    s4 <- s4 + order/2 * (log(deltap1) - log(rhopg))
-    s5 <- s5 + lbesselK(sqrt(deltap1 * rhopg),order)
+    s3 <- s3 + p / 2 * log(sigma_det(ni, rho))
+    s4 <- s4 + order / 2 * (log(deltap1) - log(rhopg))
+    s5 <- s5 + lbesselK(sqrt(deltap1 * rhopg), order)
 
   }
   # s4 plus since order is negative
   s1 + s2 - s3 + s4 + s5
 }
 
-rho.mvnig.update <- function(Y, X, latentvars, theta){
+rho.mvnig.update <- function(Y, X, latentvars, theta) {
   # NM sends warnings
   # rho is constrained to prevent singularities
 
@@ -1049,11 +1056,11 @@ rho.mvnig.update <- function(Y, X, latentvars, theta){
   theta
 }
 
-tgamma_update <- function(Y, X, latentvars, theta){
+tgamma_update <- function(Y, X, latentvars, theta) {
   #return(theta)
   N <- length(Y)
 
-  theta$tgamma <- N/sum(latentvars$u)
+  theta$tgamma <- N / sum(latentvars$u)
   theta
 }
 
@@ -1106,10 +1113,10 @@ cmupdate <- function(cycle, Y, X, latentvars, theta, dist) {
   if (dist == "mvgh") {
     ret <- mvgh.cmupdate(cycle, Y, X, latentvars, theta)
   }
-  else if(dist == "mvvg"){
+  else if (dist == "mvvg") {
     ret <- mvvg.cmupdate(cycle, Y, X, latentvars, theta)
   }
-  else if(dist == "mvnig"){
+  else if (dist == "mvnig") {
     ret <- mvnig.cmupdate(cycle, Y, X, latentvars, theta)
   }
 
@@ -1121,15 +1128,25 @@ cmupdate <- function(cycle, Y, X, latentvars, theta, dist) {
 
 
 # return function, just for aggregating output
-aecmreport <- function(i,theta_g, theta, qfinal, dist) {
-  list("Iteration" = i, "Starting Value" = theta_g, "Final Value" = theta, "Stopping Criteria" = qfinal, Distribution = dist)
+aecmreport <- function(i, theta_g, theta, qfinal, dist) {
+  list(
+    "Iteration" = i,
+    "Starting Value" = theta_g,
+    "Final Value" = theta,
+    "Stopping Criteria" = qfinal,
+    Distribution = dist
+  )
 }
 
 
 aecm_mvgh <-
   function(Y,
            X,
-           theta_g = NULL, dist = "mvgh", stopping = 1e-3, thresh = Inf, iter = 50) {
+           theta_g = NULL,
+           dist = "mvgh",
+           stopping = 1e-3,
+           thresh = Inf,
+           iter = 50) {
     # Model Parameter Dimensions:
     # Y_i is ni x p
     # X_i is n_i x q
@@ -1173,7 +1190,6 @@ aecm_mvgh <-
 
     # main loop
     for (i in seq(iter)) {
-
       # save the previous guess in history in case
       thetahist <- append(thetahist, list(theta))
 
@@ -1183,7 +1199,9 @@ aecm_mvgh <-
       # 3. rho
       # 4. Psi
       # 5+: mixing variable
-      cat("\r",(paste0("Completed ", i - 1, "/", iter, " iterations")))
+      cat("\r", (paste0(
+        "Completed ", i - 1, "/", iter, " iterations"
+      )))
 
       for (j in 1:length(theta_g)) {
         # thetahist <- c(thetahist, theta)
@@ -1204,7 +1222,7 @@ aecm_mvgh <-
 
         # if (is.nan(q_current)) {
         #   browser()
-        # }
+        #}
         #
 
         ## CM-Step ##
@@ -1214,12 +1232,12 @@ aecm_mvgh <-
           error = function(e) {
             print(e)
             # browser()
-            return(aecmreport(-1,theta_g, theta, linfhist, dist))
+            return(aecmreport(-1, theta_g, theta, linfhist, dist))
 
           }
         )
         # note that this does not break program because Iteration not assigned until return statement
-        if(!is.null(theta$Iteration)){
+        if (!is.null(theta$Iteration)) {
           return(theta)
         }
 
@@ -1229,15 +1247,16 @@ aecm_mvgh <-
 
       }
 
-      #qdiff <- qhistrow - tail(qhist, 1)
+
+      #qdiff <- qhistrow - utils::tail(qhist, 1)
       #print(matrix(qdiff, 1, 6))
 
       # compute l-infinity norm and check stopping condition
 
       tryCatch(
-        linf_i <- max(abs(unlist(theta) - unlist(tail(
-          thetahist, 1
-        )))),
+        linf_i <- max(abs(unlist(theta) - unlist(
+          utils::tail(thetahist, 1)
+        ))),
         error = function(e) {
           print(e)
           browser()
@@ -1246,9 +1265,9 @@ aecm_mvgh <-
 
       #linf_i <-  linf(theta)
       linfhist <- c(linfhist, linf_i)
-      #diff <- abs(c(-1, 1) %*% tail(linfhist, 2))
+      #diff <- abs(c(-1, 1) %*% utils::tail(linfhist, 2))
       # print(linf_i)
-      if (linf_i < stopping || ( i >10 && linf_i > thresh)) {
+      if (linf_i < stopping || (i > 10 && linf_i > thresh)) {
         #browser()
         return(aecmreport(i, theta_g, theta, linfhist, dist))
       }
@@ -1258,10 +1277,12 @@ aecm_mvgh <-
       # maxdiff <- max(qdiff)
       # if (maxdiff < stopping & maxdiff > 0) {
       #   return(aecmreport(i, theta_g,theta, qhist))
-      # }
+      #}
 
     }
-    cat("\r",(paste0("Completed ", iter, "/", iter, " iterations")))
+    cat("\r", (paste0(
+      "Completed ", iter, "/", iter, " iterations"
+    )))
     cat("\n")
     # worst case: no convergence
     aecmreport(Inf, theta_g, theta, linfhist, dist)
@@ -1277,42 +1298,42 @@ aecm_mvgh <-
 #   # add mvsk funciton here with error checks, likelihood/aic summary, etc
 #   if(!is.list(Y) | !is.list(X)){
 #     stop("Data not in list format")
-#   } else if (!(dist %in% c("mvgh", "mvvg", "mvnig"))) {
+#  } else if (!(dist %in% c("mvgh", "mvvg", "mvnig"))) {
 #     stop("Invalid distribution")
-#   } else if (!is.numeric(stopping)){
+#  } else if (!is.numeric(stopping)){
 #     stop("Non-numeric stopping value")
-#   } else if (!is.numeric(max_iter) | max_iter < 1){
+#  } else if (!is.numeric(max_iter) | max_iter < 1){
 #     stop("Invalid max iteration value")
-#   }
+#  }
 #
 #
 #   # You stopped here
 #   aecm_mvgh(Y,X,theta_g, dist, stopping = stopping, thresh = Inf, iter = max_iter)
 #
-# }
+#}
 
 
-AIC <- function(dist, Y,X,theta){
-  if(dist == "mvgh"){
+AIC <- function(dist, Y, X, theta) {
+  if (dist == "mvgh") {
     loglik <- q1.mvgh.update
-  } else if (dist == "mvvg"){
+  } else if (dist == "mvvg") {
     loglik <- q1.mvvg.update
-  } else if (dist == "mvnig"){
+  } else if (dist == "mvnig") {
     loglik <- q1.mvnig.update
   } else{
     stop("Unsupported Distribution")
   }
 
   q <- length(unlist(theta))
-  2*q - 2*loglik(Y,X,theta)
+  2 * q - 2 * loglik(Y, X, theta)
 }
 
-BIC <- function(dist, Y,X,theta){
-  if(dist == "mvgh"){
+BIC <- function(dist, Y, X, theta) {
+  if (dist == "mvgh") {
     loglik <- q1.mvgh.update
-  } else if (dist == "mvvg"){
+  } else if (dist == "mvvg") {
     loglik <- q1.mvvg.update
-  } else if (dist == "mvnig"){
+  } else if (dist == "mvnig") {
     loglik <- q1.mvnig.update
   } else{
     stop("Unsupported Distribution")
@@ -1321,7 +1342,7 @@ BIC <- function(dist, Y,X,theta){
   q <- length(unlist(theta))
   ni <- unlist(sapply(Y, nrow))
   n <- sum(ni) * ncol(Y[[1]])
-  q*log(n) - 2*loglik(Y,X,theta)
+  q * log(n) - 2 * loglik(Y, X, theta)
 }
 
 
@@ -1341,7 +1362,7 @@ BIC <- function(dist, Y,X,theta){
 #'  If NULL, will be randomly generated. See Details for an in-depth explanation.
 #' @param stopping Stopping threshold for the L-infinity norm of differences in consecutive parameter space, evaluated at iteration \eqn{t+1} as
 #' \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty}. Default is 0.001
-#' @param iter Maximum number of iterations, default is 50.
+#' @param max_iter Maximum number of iterations, default is 50.
 #' @details
 #' Fits the matrix-variate skew regression model
 #'
@@ -1351,32 +1372,32 @@ BIC <- function(dist, Y,X,theta){
 #'
 #' The model estimates MVVG parameters \eqn{\Theta, \underline{a}, r, \Psi, \gamma} using the alternating expectation conditional maximization (AECM) algorithm, using the density
 #'
-#' \deqn{f(Y_i| X_i\Theta,\underline{a},r, \Psi, \gamma, n_i, p) = \dfrac{2\gamma^\gamma \exp[tr(\Sigma_i^{-1}(Y_i- X_i\Theta)\Psi^{-1}A_i^T)]}{(2\pi)^{n_ip/2} |\Sigma_i|^{p/2} |\Psi|^{n_i/2} \Gamma(\gamma)} \bigg( \dfrac{\delta(Y_i;  X_i\Theta, \Sigma_i, \Psi)}{\rho (A_i, \Sigma_i,\Psi) + 2\gamma} \bigg)^{(\gamma - n_ip/2)/2} \\ \times K_{(\gamma - n_ip/2)} \big( \sqrt{[\rho(A_i, \Sigma_i, \Psi) + 2\gamma][\delta(Y_i; X_i\Theta,\Sigma_i,\Psi)]} \big),}
+#' \deqn{f(Y_i| X_i\Theta,\underline{a},r, \Psi, \gamma, n_i, p) = \dfrac{2\gamma^\gamma \exp[matlib::tr(\Sigma_i^{-1}(Y_i- X_i\Theta)\Psi^{-1}A_i^T)]}{(2\pi)^{n_ip/2} |\Sigma_i|^{p/2} |\Psi|^{n_i/2} \Gamma(\gamma)} \bigg( \dfrac{\delta(Y_i;  X_i\Theta, \Sigma_i, \Psi)}{\rho (A_i, \Sigma_i,\Psi) + 2\gamma} \bigg)^{(\gamma - n_ip/2)/2} \\ \times K_{(\gamma - n_ip/2)} \big( \sqrt{[\rho(A_i, \Sigma_i, \Psi) + 2\gamma][\delta(Y_i; X_i\Theta,\Sigma_i,\Psi)]} \big),}
 #'
 #' where \eqn{A_i = \underline{1}_{n_i} \times \underline{a}^T}, \eqn{\Sigma_i = I_{n_i} + r(\underline{1}_{n_i}\underline{1}_{n_i}^T - I_{n_i})},
-#'  \eqn{\delta(X;M, \Sigma, \Psi) = tr(\Sigma^{-1}(X-M)\Psi^{-1}(X-M)^T)}, \eqn{\rho(A, \Sigma, \Psi) = tr(\Sigma^{-1}A\Psi^{-1}A^T)}, and \eqn{K_{\nu}(x)} is the modified Bessel function of the second kind.
+#'  \eqn{\delta(X;M, \Sigma, \Psi) = matlib::tr(\Sigma^{-1}(X-M)\Psi^{-1}(X-M)^T)}, \eqn{\rho(A, \Sigma, \Psi) = matlib::tr(\Sigma^{-1}A\Psi^{-1}A^T)}, and \eqn{K_{\nu}(x)} is the modified Bessel function of the second kind.
 #'
 #' The structure of `theta_g` and parameter estimates returned by the function must be in the form of a list with the following named elements:
 #'
-#' \itemize{
-#'  \item{`Theta`: } {\eqn{q \times p} coefficient matrix}
-#'  \item{`a`: } {\eqn{p \times 1} skewness vector}
-#'  \item{`rho`: } {Compound symmetry parameter for row correlation matrix}
-#'  \item{`Psi`: } {\eqn{p \times p} column covariance matrix}
-#'  \item{`gamma`: } {Univariate mixing parameter}
-#' }
+#' \describe{
+#'  \item{`Theta`: }{\eqn{q \times p} coefficient matrix}
+#'  \item{`a`: }{\eqn{p \times 1} skewness vector}
+#'  \item{`rho`: }{Compound symmetry parameter for row correlation matrix}
+#'  \item{`Psi`: }{\eqn{p \times p} column covariance matrix}
+#'  \item{`gamma`: }{Univariate mixing parameter}
+#'}
 #'
 #' @return MVVGmod returns a list with the following elements:
 #'
-#' \itemize{
-#'  \item{`Iteration`: } {Number of iterations taken to convergence. `Inf` if convergence not reached.}
-#'  \item{`Starting Value`: } {List of initial parameter values.}
-#'  \item{`Final Value`: } {List of final parameter estimates.}
-#'  \item{`Stopping Criteria`: } {Vector of \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty} at each iteration.}
-#'  \item{`AIC`: } Model AIC
-#'  \item{`BIC`: } Model BIC
+#' \describe{
+#'  \item{`Iteration`: }{Number of iterations taken to convergence. `Inf` if convergence not reached.}
+#'  \item{`Starting Value`: }{List of initial parameter values.}
+#'  \item{`Final Value`: }{List of final parameter estimates.}
+#'  \item{`Stopping Criteria`: }{Vector of \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty} at each iteration.}
+#'  \item{`AIC`: }{Model AIC}
+#'  \item{`BIC`: }{Model BIC}
 
-#' }
+#'}
 
 #' @export
 
@@ -1385,37 +1406,47 @@ BIC <- function(dist, Y,X,theta){
 #' @author Qingyang Liu
 #'
 #' @examples
-#' set.seed(1234)
+#' \dontrun{set.seed(1234)
 #' # num response variables
 #' p <- ncol(gaad_res[[1]])
 #' # num covariates
 #' q <- ncol(gaad_cov[[1]])
 #' # generate initial value to input, then run AECM with MVVG distribution
-#' initial_mvvg_theta <- list(Theta = matrix(rnorm(p*q), nrow = q, ncol = p),
+#' initial_mvvg_theta <- list(Theta = matrix(stats::rnorm(p*q), nrow = q, ncol = p),
 #'                       A = rep(1,p),
 #'                      rho = 0.3,
 #'                      Psi = diag(p),
 #'                      gamma = 4)
-#' MVVGmod(gaad_res[1:50], gaad_cov[1:50], initial_mvvg_theta)
+#' MVVGmod(gaad_res[1:50], gaad_cov[1:50], initial_mvvg_theta)}
 #'
 MVVGmod <- function(Y,
                     X,
                     theta_g = NULL,
                     stopping = 1e-3,
                     max_iter = 50) {
-  if(!is.list(Y) | !is.list(X)){
+  if (!is.list(Y) | !is.list(X)) {
     stop("Data not in list format")
-  } else if (!is.numeric(stopping)){
+  } else if (!is.numeric(stopping)) {
     stop("Non-numeric stopping value")
-  } else if (!is.numeric(max_iter) | max_iter < 1){
+  } else if (!is.numeric(max_iter) | max_iter < 1) {
     stop("Invalid max iteration value")
   }
 
 
-  ret <- aecm_mvgh(Y,X,theta_g, "mvvg", stopping = stopping, thresh = Inf, iter = max_iter)
-  c(ret,
-    AIC = AIC("mvvg", Y,X,ret$`Final Value`),
-    BIC = BIC("mvvg", Y,X,ret$`Final Value`))
+  ret <- aecm_mvgh(
+    Y,
+    X,
+    theta_g,
+    "mvvg",
+    stopping = stopping,
+    thresh = Inf,
+    iter = max_iter
+  )
+  c(
+    ret,
+    AIC = AIC("mvvg", Y, X, ret$`Final Value`),
+    BIC = BIC("mvvg", Y, X, ret$`Final Value`)
+  )
 
 }
 
@@ -1435,7 +1466,7 @@ MVVGmod <- function(Y,
 #'  If NULL, will be randomly generated. See Details for an in-depth explanation.
 #' @param stopping Stopping threshold for the L-infinity norm of differences in consecutive parameter space, evaluated at iteration \eqn{t+1} as
 #' \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty}. Default is 0.001
-#' @param iter Maximum number of iterations, default is 50.
+#' @param max_iter Maximum number of iterations, default is 50.
 #' @details
 #' Fits the matrix-variate skew regression model
 #'
@@ -1445,32 +1476,32 @@ MVVGmod <- function(Y,
 #'
 #' The model estimates MVVG parameters \eqn{\Theta, \underline{a}, r, \Psi, \tilde\gamma} using the alternating expectation conditional maximization (AECM) algorithm, using the density
 #'
-#' \deqn{f(Y_i|M_i,\underline{a},r, \Psi, \tilde\gamma, n_i, p) = \dfrac{2 \exp[tr(\Sigma_i^{-1}(Y_i-M_i)\Psi^{-1}A_i^T) + \tilde\gamma]}{(2\pi)^{\frac{n_ip}{2} + 1} |\Sigma_i|^{\frac{p}{2}} |\Psi|^{\frac{n_i}{2}}} \bigg( \dfrac{\delta(Y_i; M_i, \Sigma_i, \Psi) + 1}{\rho (A_i, \Sigma_i,\Psi) + \tilde\gamma^2} \bigg)^{-\frac{(1+n_ip)}{4}} \\ \times K_{-\frac{(1+n_ip)}{2}} \big( \sqrt{[\rho(A_i, \Sigma_i, \Psi) + \tilde\gamma^2][\delta(Y_i;M_i,\Sigma_i,\Psi) + 1]} \big),}
+#' \deqn{f(Y_i|M_i,\underline{a},r, \Psi, \tilde\gamma, n_i, p) = \dfrac{2 \exp[matlib::tr(\Sigma_i^{-1}(Y_i-M_i)\Psi^{-1}A_i^T) + \tilde\gamma]}{(2\pi)^{\frac{n_ip}{2} + 1} |\Sigma_i|^{\frac{p}{2}} |\Psi|^{\frac{n_i}{2}}} \bigg( \dfrac{\delta(Y_i; M_i, \Sigma_i, \Psi) + 1}{\rho (A_i, \Sigma_i,\Psi) + \tilde\gamma^2} \bigg)^{-\frac{(1+n_ip)}{4}} \\ \times K_{-\frac{(1+n_ip)}{2}} \big( \sqrt{[\rho(A_i, \Sigma_i, \Psi) + \tilde\gamma^2][\delta(Y_i;M_i,\Sigma_i,\Psi) + 1]} \big),}
 #'
 #' where \eqn{A_i = \underline{1}_{n_i} \times \underline{a}^T}, \eqn{\Sigma_i = I_{n_i} + r(\underline{1}_{n_i}\underline{1}_{n_i}^T - I_{n_i})},
-#'  \eqn{\delta(X;M, \Sigma, \Psi) = tr(\Sigma^{-1}(X-M)\Psi^{-1}(X-M)^T)}, \eqn{\rho(A, \Sigma, \Psi) = tr(\Sigma^{-1}A\Psi^{-1}A^T)}, and \eqn{K_{\nu}(x)} is the modified Bessel function of the second kind.
+#'  \eqn{\delta(X;M, \Sigma, \Psi) = matlib::tr(\Sigma^{-1}(X-M)\Psi^{-1}(X-M)^T)}, \eqn{\rho(A, \Sigma, \Psi) = matlib::tr(\Sigma^{-1}A\Psi^{-1}A^T)}, and \eqn{K_{\nu}(x)} is the modified Bessel function of the second kind.
 #'
 #' The structure of `theta_g` and parameter estimates returned by the function must be in the form of a list with the following named elements:
 #'
-#' \itemize{
-#'  \item{`Theta`: } {\eqn{q \times p} coefficient matrix}
-#'  \item{`a`: } {\eqn{p \times 1} skewness vector}
-#'  \item{`rho`: } {Compound symmetry parameter for row correlation matrix}
-#'  \item{`Psi`: } {\eqn{p \times p} column covariance matrix}
-#'  \item{`tgamma`: } {Univariate mixing parameter}
-#' }
+#' \describe{
+#'  \item{`Theta`: }{\eqn{q \times p} coefficient matrix}
+#'  \item{`a`: }{\eqn{p \times 1} skewness vector}
+#'  \item{`rho`: }{Compound symmetry parameter for row correlation matrix}
+#'  \item{`Psi`: }{\eqn{p \times p} column covariance matrix}
+#'  \item{`tgamma`: }{Univariate mixing parameter}
+#'}
 #'
 #' @return MVNIGmod returns a list with the following elements:
 #'
-#' \itemize{
-#'  \item{`Iteration`: } {Number of iterations taken to convergence. `Inf` if convergence not reached.}
-#'  \item{`Starting Value`: } {List of initial parameter values.}
-#'  \item{`Final Value`: } {List of final parameter estimates.}
-#'  \item{`Stopping Criteria`: } {Vector of \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty} at each iteration.}
-#'  \item{`AIC`: } Model AIC
-#'  \item{`BIC`: } Model BIC
+#' \describe{
+#'  \item{`Iteration`: }{Number of iterations taken to convergence. `Inf` if convergence not reached.}
+#'  \item{`Starting Value`: }{List of initial parameter values.}
+#'  \item{`Final Value`: }{List of final parameter estimates.}
+#'  \item{`Stopping Criteria`: }{Vector of \eqn{|\hat\theta^{t+1} - \hat\theta^{t}|_\infty} at each iteration.}
+#'  \item{`AIC`: }{Model AIC}
+#'  \item{`BIC`: }{Model BIC}
 
-#' }
+#'}
 
 #' @export
 
@@ -1479,54 +1510,66 @@ MVVGmod <- function(Y,
 #' @author Qingyang Liu
 #'
 #' @examples
-#' set.seed(1234)
+#' \dontrun{set.seed(1234)
 #' # num response variables
 #' p <- ncol(gaad_res[[1]])
 #' # num covariates
 #' q <- ncol(gaad_cov[[1]])
 #' # generate initial value to input, then run AECM with MVVG distribution
-#' initial_mvnig_theta <- list(Theta = matrix(rnorm(p*q), nrow = q, ncol = p),
+#' initial_mvnig_theta <- list(Theta = matrix(stats::rnorm(p*q), nrow = q, ncol = p),
 #'                       A = rep(1,p),
 #'                      rho = 0.3,
 #'                      Psi = diag(p),
-#'                      tgamma = 4)
-#' MVNIGmod(gaad_res[1:50], gaad_cov[1:50], initial_mvnig_theta)
+#'                      tgamma = 3)
+#' MVNIGmod(gaad_res[1:30], gaad_cov[1:30], initial_mvnig_theta)}
 #'
 MVNIGmod <- function(Y,
-                    X,
-                    theta_g = NULL,
-                    stopping = 1e-3,
-                    max_iter = 50) {
-  if(!is.list(Y) | !is.list(X)){
+                     X,
+                     theta_g = NULL,
+                     stopping = 1e-3,
+                     max_iter = 50) {
+  if (!is.list(Y) | !is.list(X)) {
     stop("Data not in list format")
-  } else if (!is.numeric(stopping)){
+  } else if (!is.numeric(stopping)) {
     stop("Non-numeric stopping value")
-  } else if (!is.numeric(max_iter) | max_iter < 1){
+  } else if (!is.numeric(max_iter) | max_iter < 1) {
     stop("Invalid max iteration value")
   }
 
 
-  ret <- aecm_mvgh(Y,X,theta_g, "mvnig", stopping = stopping, thresh = Inf, iter = max_iter)
-  c(ret,
-    AIC = AIC("mvnig", Y,X,ret$`Final Value`),
-    BIC = BIC("mvnig", Y,X,ret$`Final Value`))
+  ret <- aecm_mvgh(
+    Y,
+    X,
+    theta_g,
+    "mvnig",
+    stopping = stopping,
+    thresh = Inf,
+    iter = max_iter
+  )
+  c(
+    ret,
+    AIC = AIC("mvnig", Y, X, ret$`Final Value`),
+    BIC = BIC("mvnig", Y, X, ret$`Final Value`)
+  )
 
 }
 
-mv_predict <- function(X,theta, dist){
+mv_predict <- function(X, theta, dist) {
   Theta <- theta$Theta
   A <- theta$A
   mixparams <- theta[-(1:4)]
 
-  if(dist == "mvgh"){
-    mix_ev <- besselRatio(mixparams$omega, nu = mixparams$lambda, orderDiff = 1)
-  }else if(dist == "mvvg"){
+  if (dist == "mvgh") {
+    mix_ev <- DistributionUtils::besselRatio(mixparams$omega,
+                          nu = mixparams$lambda,
+                          orderDiff = 1)
+  } else if (dist == "mvvg") {
     mix_ev <- 1
-  }else if(dist == "mvnig"){
-    mix_ev <- 1/mixparams$tgamma
+  } else if (dist == "mvnig") {
+    mix_ev <- 1 / mixparams$tgamma
   }
   ret <- list()
-  for(i in 1:length(X)){
+  for (i in 1:length(X)) {
     Xi <- X[[i]]
     ni <- nrow(Xi)
     Mi <- Xi %*% Theta
@@ -1555,25 +1598,25 @@ mv_predict <- function(X,theta, dist){
 #' @author Qingyang Liu
 #'
 #' @examples
-#' set.seed(1234)
+#' \dontrun{set.seed(1234)
 #' # num response variables
 #' p <- ncol(gaad_res[[1]])
 #' # num covariates
 #' q <- ncol(gaad_cov[[1]])
 #' # generate initial value to input, then run AECM with MVVG distribution
-#' initial_mvnig_theta <- list(Theta = matrix(rnorm(p*q), nrow = q, ncol = p),
+#' initial_mvnig_theta <- list(Theta = matrix(stats::rnorm(p*q), nrow = q, ncol = p),
 #'                       A = rep(1,p),
 #'                      rho = 0.3,
 #'                      Psi = diag(p),
 #'                      tgamma = 4)
 #' mvnig_mod <- MVNIGmod(gaad_res[1:50], gaad_cov[1:50], initial_mvnig_theta)
 #'
-#' predict(mvnig_mod, gaad_cov[1:50])
-predict <- function(mod,X){
+#' predict(mvnig_mod, gaad_cov[1:50])}
+predict <- function(mod, X) {
   theta <- mod$`Final Value`
-  if(!is.null(theta$gamma)){
+  if (!is.null(theta$gamma)) {
     mv_predict(X, theta, "mvvg")
-  }else{
+  } else{
     mv_predict(X, theta, "mvnig")
   }
 }
@@ -1581,5 +1624,41 @@ predict <- function(mod,X){
 # mod_aic <- function(loglik, Y,X,theta){
 #   q <- length(unlist(theta))
 #   2*q - 2*loglik(Y,X,theta)
-# }
+#}
+
+#' GAAD Data
+#'
+#' These data sets describe periodontal measurements performed on members of the Gullah-Speaking African American community.
+#'
+#' `gaad_res` and `gaad_cov` contain the response and covariate matrices of the GAAD data.
+#'
+#' @format Each is a list of matrices, with rows denoting tooth sites and columns denoting CAL/PPD response.
+#' @examples
+#' gaad_cov
+#' gaad_res
+"gaad_res"
+
+#' GAAD Data
+#'
+#' These data sets describe periodontal measurements performed on members of the Gullah-Speaking African American community.
+#'
+#' `gaad_res` and `gaad_cov` contain the response and covariate matrices of the GAAD data.
+#'
+#' @format Each is a list of matrices, with rows denoting tooth sites and columns denoting CAL/PPD response.
+#' @examples
+#' gaad_cov
+#' gaad_res
+"gaad_cov"
+
+#' MVVG Parameter Format
+#'
+#' This is an example of the format of input parameter list theta.
+#'
+#'
+#' @format List of model parameters.
+#' @examples
+#' mvvg_theta
+"mvvg_theta"
+
+
 

@@ -15,20 +15,20 @@ predict(mod, X)
 Predicts response values given a list of covariate matrices and a model output from either MVVGmod or MVNIGmod.
 }
 \examples{
-set.seed(1234)
+\dontrun{set.seed(1234)
 # num response variables
 p <- ncol(gaad_res[[1]])
 # num covariates
 q <- ncol(gaad_cov[[1]])
 # generate initial value to input, then run AECM with MVVG distribution
-initial_mvnig_theta <- list(Theta = matrix(rnorm(p*q), nrow = q, ncol = p),
+initial_mvnig_theta <- list(Theta = matrix(stats::rnorm(p*q), nrow = q, ncol = p),
                       A = rep(1,p),
                      rho = 0.3,
                      Psi = diag(p),
                      tgamma = 4)
 mvnig_mod <- MVNIGmod(gaad_res[1:50], gaad_cov[1:50], initial_mvnig_theta)
 
-predict(mvnig_mod, gaad_cov[1:50])
+predict(mvnig_mod, gaad_cov[1:50])}
 }
 \author{
 Samuel Soon

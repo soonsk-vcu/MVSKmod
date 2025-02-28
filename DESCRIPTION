@@ -1,12 +1,17 @@
 Package: MVSKmod
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Matrix-Variate Skew Linear Regression Models
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Authors@R: 
+    c(person("Samuel", "Soon", , "samksoon2@gmail.com", role = c("aut", "cre"),
+           comment = c()),
+           person("Dipankar", "Bandyopadhyay", , "dbandyop@vcu.edu", role = c("aut"),
+           comment = c()),
+           person("Qingyang", "Liu", , "qliu432@wisc.edu", role = c("aut"),
+           comment = c()))           
+Maintainer: Samuel Soon <samksoon2@gmail.com>
+Description: Provides methods for estimation and prediction involving linear models with matrix-variate variance gamma (MVVG) and matrix-variate normal-inverse Gaussian (MVNIG) errors.
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
@@ -15,16 +20,9 @@ Imports:
     Bessel,
     clusterGeneration,
     DistributionUtils,
-    extraDistr,
-    GeneralizedHyperbolic,
     matlib,
-    MatrixMixtures,
     maxLik,
-    MixMatrix,
-    mvtnorm,
-    optimParallel,
-    parallel,
-    sn,
-    truncnorm
+    truncnorm,
+    pracma
 URL: https://github.com/soonsk-vcu/MVSKmod
 BugReports: https://github.com/soonsk-vcu/MVSKmod/issues
